@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Mines</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0f212e;
+    color: white;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .game { width: 360px; }
+
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .balance { color: #00ff88; font-weight: bold; font-size: 15px; }
+  .mult { color: #ffe600; font-weight: bold; font-size: 18px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+    margin-bottom: 12px;
+  }
+  .cell {
+    aspect-ratio: 1;
+    background: #1a3040;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 22px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.08s, background 0.15s;
+    user-select: none;
+  }
+  .cell:hover:not(:disabled) { background: #2a4050; }
+  .cell:active:not(:disabled) { transform: scale(0.94); }
+  .cell.safe { background: #0d4d2c; color: #00ff88; }
+  .cell.mine { background: #ff1744; }
+  .cell.mine-hidden { background: #3a1020; color: #ff1744; }
+  .cell:disabled { cursor: default; }
+
+  .row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .row label { font-size: 11px; font-weight: bold; }
+
+  input {
+    width: 70px;
+    padding: 6px;
+    background: #1a3040;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    text-align: center;
+    font-size: 13px;
+    outline: none;
+  }
+
+  button.small {
+    background: #2a4050;
+    color: white;
+    border: none;
+    padding: 6px 9px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: bold;
+  }
+  button.small:hover { background: #3a5060; }
+
+  .mine-opt {
+    background: #1a3040;
+    color: white;
+    border: 1px solid #2a4050;
+    padding: 5px 9px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: bold;
+  }
+  .mine-opt.active { background: #00c853; border-color: #00c853; }
+
+  .play-row {
+    display: flex;
+    gap: 6px;
+    margin: 10px 0;
+  }
+  .play-btn, .cashout-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    color: white;
+    cursor: pointer;
+  }
+  .play-btn { background: #00c853; }
+  .play-btn:disabled { background: #555; cursor: default; }
+  .cashout-btn { background: #ff9800; }
+  .cashout-btn:disabled { background: #555; cursor: default; }
+
+  .info {
+    text-align: center;
+    font-size: 12px;
+    color: #8090a0;
+    margin-top: 6px;
+    min-height: 18px;
+  }
+  .info.win { color: #00ff88; font-weight: bold; }
+  .info.lose { color: #ff1744; font-weight: bold; }
+
+  .admin {
+    margin-top: 14px;
+    padding: 10px;
+    background: #1a2430;
+    border: 1px solid #2a4050;
+    border-radius: 8px;
+  }
+  .admin-title {
+    font-size: 11px;
+    color: #8090a0;
+    font-weight: bold;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .admin-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .admin-row input { width: 90px; }
+  .admin-row button {
+    background: #ff9800;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: bold;
+  }
+  .admin-row button:hover { background: #ffa726; }
+  .admin-row button.danger { background: #ff1744; }
+  .admin-row button.danger:hover { background: #ff4569; }
+</style>
+</head>
+<body>
+<div class="game">
+  <div class="top">
+    <div class="balance">💰 <span id="balance">1000</span></div>
+    <div class="mult" id="mult">×1.00</div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="row">
+    <label>Ставка:</label>
+    <input type="number" id="bet" value="10" min="1">
+    <button class="small" onclick="addBet(10)">+10</button>
+    <button class="small" onclick="addBet(50)">+50</button>
+    <button class="small" onclick="addBet(100)">+100</button>
+    <button class="small" onclick="maxBet()">MAX</button>
+  </div>
+
+  <div class="row">
+    <label>Мин:</label>
+    <div id="mineOptions" style="display:flex;gap:3px;flex-wrap:wrap;"></div>
+  </div>
+
+  <div class="play-row">
+    <button class="play-btn" id="playBtn" onclick="startGame()">ИГРАТЬ</button>
+    <button class="cashout-btn" id="cashoutBtn" onclick="cashout()" disabled>ЗАБРАТЬ</button>
+  </div>
+
+  <div class="info" id="info">Выбери ставку, мины и жми ИГРАТЬ</div>
+
+  <div class="admin">
+    <div class="admin-title">💳 Управление балансом</div>
+    <div class="admin-row">
+      <input type="number" id="addAmount" value="1000" min="1">
+      <button onclick="addBalance()">+ Добавить</button>
+      <button onclick="setBalance()">= Установить</button>
+      <button class="danger" onclick="resetBalance()">Сброс</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================== НАСТРОЙКИ ==================
+const COLS = 5, ROWS = 5;
+const MULT_TABLE = {
+  1:  [1.00,1.03,1.08,1.12,1.18,1.24,1.31,1.39,1.48,1.58,
+       1.70,1.83,1.99,2.18,2.40,2.66,2.99,3.41,3.94,4.65,
+       5.60,7.00,9.33,14.00,24.75],
+  3:  [1.00,1.13,1.29,1.48,1.71,1.99,2.35,2.79,3.35,4.07,
+       5.01,6.26,7.96,10.35,13.80,18.97,27.11,40.66,65.06,113.85,
+       227.70,569.25],
+  5:  [1.00,1.24,1.56,1.99,2.58,3.39,4.52,6.14,8.53,12.12,
+       17.68,26.53,41.27,66.93,113.85,208.72,417.45,939.25,2505.33,8768.66,
+       35074.62],
+  10: [1.00,1.51,2.35,3.78,6.35,11.28,21.27,43.03,95.62,239.05,
+       689.65,2413.78,10663.83,63983.0],
+  15: [1.00,1.85,3.66,7.78,18.15,48.39,153.24,596.94,2984.7],
+  20: [1.00,2.25,5.62,16.87,67.49,404.95],
+  24: [1.00,3.00,12.00,75.0,750.0]
+};
+
+// ================== СОСТОЯНИЕ ==================
+let balance = 1000;
+let bet = 10;
+let minesCount = 3;
+let gameActive = false;
+let openedCells = [];
+let minesPositions = new Set();
+let currentBet = 0;
+
+// ================== СОХРАНЕНИЕ ==================
+function save() {
+  localStorage.setItem("mines_save", JSON.stringify({
+    balance, bet, minesCount
+  }));
+}
+function load() {
+  const raw = localStorage.getItem("mines_save");
+  if (!raw) return;
+  try {
+    const d = JSON.parse(raw);
+    if (typeof d.balance === "number") balance = d.balance;
+    if (typeof d.bet === "number") bet = d.bet;
+    if (typeof d.minesCount === "number") minesCount = d.minesCount;
+  } catch(e) {}
+}
+
+// ================== UI ==================
+function updateUI() {
+  document.getElementById("balance").textContent = balance.toFixed(2);
+  document.getElementById("bet").value = Math.floor(bet);
+}
+function setInfo(text, cls = "") {
+  const el = document.getElementById("info");
+  el.textContent = text;
+  el.className = "info" + (cls ? " " + cls : "");
+}
+
+function buildGrid() {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const btn = document.createElement("button");
+      btn.className = "cell";
+      btn.dataset.r = r;
+      btn.dataset.c = c;
+      btn.onclick = () => clickCell(r, c);
+      grid.appendChild(btn);
+    }
+  }
+}
+
+function buildMineOptions() {
+  const wrap = document.getElementById("mineOptions");
+  wrap.innerHTML = "";
+  [1, 3, 5, 10, 15, 20, 24].forEach(m => {
+    const b = document.createElement("button");
+    b.className = "mine-opt" + (m === minesCount ? " active" : "");
+    b.textContent = m;
+    b.onclick = () => {
+      if (gameActive) return;
+      minesCount = m;
+      buildMineOptions();
+      save();
+    };
+    wrap.appendChild(b);
+  });
+}
+
+// ================== ЛОГИКА ==================
+function getCell(r, c) {
+  const idx = r * COLS + c;
+  return document.getElementById("grid").children[idx];
+}
+
+function addBet(a) {
+  if (gameActive) return;
+  const cur = parseInt(document.getElementById("bet").value) || 0;
+  document.getElementById("bet").value = cur + a;
+}
+function maxBet() {
+  if (gameActive) return;
+  document.getElementById("bet").value = Math.floor(balance);
+}
+
+function getMult() {
+  if (openedCells.length === 0) return 1.0;
+  const table = MULT_TABLE[minesCount] || MULT_TABLE[3];
+  const idx = Math.min(openedCells.length, table.length - 1);
+  return table[idx];
+}
+
+function startGame() {
+  if (gameActive) return;
+  const inputBet = parseFloat(document.getElementById("bet").value);
+  if (!inputBet || inputBet <= 0) { alert("Введи ставку"); return; }
+  if (inputBet > balance) { alert("Недостаточно средств"); return; }
+
+  bet = inputBet;
+  currentBet = bet;
+  balance -= bet;
+  save();
+  updateUI();
+
+  // сброс поля
+  openedCells = [];
+  minesPositions.clear();
+  gameActive = true;
+  document.querySelectorAll(".cell").forEach(c => {
+    c.className = "cell";
+    c.textContent = "";
+    c.disabled = false;
+  });
+  document.getElementById("playBtn").disabled = true;
+  document.getElementById("cashoutBtn").disabled = false;
+  document.getElementById("mult").textContent = "×1.00";
+
+  // расстановка мин
+  const all = [];
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++) all.push([r, c]);
+  shuffle(all);
+  for (let i = 0; i < minesCount; i++)
+    minesPositions.add(all[i][0] + "," + all[i][1]);
+
+  setInfo("Игра идёт! Ставка: " + bet, "win");
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function clickCell(r, c) {
+  if (!gameActive) return;
+  if (openedCells.includes(r + "," + c)) return;
+
+  const btn = getCell(r, c);
+  const key = r + "," + c;
+
+  if (minesPositions.has(key)) {
+    // мина
+    btn.classList.add("mine");
+    btn.textContent = "💣";
+    gameActive = false;
+    revealAll();
+    document.getElementById("playBtn").disabled = false;
+    document.getElementById("cashoutBtn").disabled = true;
+    document.getElementById("mult").textContent = "×0.00";
+    setInfo("💥 Мина! Потерял " + currentBet.toFixed(2), "lose");
+    save();
+  } else {
+    // безопасно
+    openedCells.push(key);
+    btn.classList.add("safe");
+    btn.textContent = "💎";
+
+    const mult = getMult();
+    document.getElementById("mult").textContent = "×" + mult.toFixed(2);
+    const potential = currentBet * mult;
+    setInfo("Открыто " + openedCells.length + " | Забрать " + potential.toFixed(2), "win");
+
+    // все безопасные открыты
+    const safeTotal = ROWS * COLS - minesCount;
+    if (openedCells.length >= safeTotal) {
+      cashout();
+    }
+  }
+}
+
+function cashout() {
+  if (!gameActive || openedCells.length === 0) return;
+  const mult = getMult();
+  const win = currentBet * mult;
+  balance += win;
+  save();
+  updateUI();
+  gameActive = false;
+  revealAll();
+  document.getElementById("playBtn").disabled = false;
+  document.getElementById("cashoutBtn").disabled = true;
+  document.getElementById("mult").textContent = "×" + mult.toFixed(2);
+  setInfo("✅ Забрал " + win.toFixed(2) + " (×" + mult.toFixed(2) +
+          ", +" + (win - currentBet).toFixed(2) + ")", "win");
+}
+
+function revealAll() {
+  document.querySelectorAll(".cell").forEach(c => c.disabled = true);
+  minesPositions.forEach(key => {
+    const [r, c] = key.split(",").map(Number);
+    if (openedCells.includes(key)) return;
+    const btn = getCell(r, c);
+    btn.classList.add("mine-hidden");
+    btn.textContent = "💣";
+  });
+}
+
+// ================== УПРАВЛЕНИЕ БАЛАНСОМ ==================
+function addBalance() {
+  const amount = parseFloat(document.getElementById("addAmount").value);
+  if (!amount || amount <= 0) { alert("Введи число > 0"); return; }
+  balance += amount;
+  save();
+  updateUI();
+  setInfo("💰 +" + amount.toFixed(2) + " добавлено");
+}
+
+function setBalance() {
+  const amount = parseFloat(document.getElementById("addAmount").value);
+  if (isNaN(amount) || amount < 0) { alert("Введи число ≥ 0"); return; }
+  balance = amount;
+  save();
+  updateUI();
+  setInfo("💰 Баланс установлен: " + amount.toFixed(2));
+}
+
+function resetBalance() {
+  if (!confirm("Сбросить баланс до 1000?")) return;
+  balance = 1000;
+  save();
+  updateUI();
+  setInfo("💰 Баланс сброшен");
+}
+
+// ================== СТАРТ ==================
+load();
+buildGrid();
+buildMineOptions();
+updateUI();
+</script>
+</body>
+</html>
